@@ -61,4 +61,12 @@ end
         @test @inferred(f(Struct(42, 1.0, "z"))) == (42, 1.0)
         @test @inferred(f(Property(42))) == (42, 1.0)
     end
+
+    @testset "Errors" begin
+        d = (; x=42, y=1.0)
+        @test_throws ArgumentError @macroexpand @unpack d
+        @test_throws ArgumentError @macroexpand @unpack (; x=42, y=1.0)
+        @test_throws ArgumentError @macroexpand @unpack x, y, (; x=42, y=1.0)
+        @test_throws ArgumentError @macroexpand @unpack x, 1 = (; x=42, y=1.0)
+    end
 end
