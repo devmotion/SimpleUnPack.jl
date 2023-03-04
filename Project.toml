@@ -1,0 +1,13 @@
+name = "SimpleUnPack"
+uuid = "ce78b400-467f-4804-87d8-8f486da07d0a"
+authors = ["David Widmann"]
+version = "1.0.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
