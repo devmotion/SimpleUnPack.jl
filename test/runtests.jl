@@ -20,6 +20,32 @@ struct Struct{X,Y,Z}
     z::Z
 end
 
+# Copied from ChainRulesCore: Test if a macro throws an error when it is expanded
+macro test_macro_throws(err_expr, expr)
+    quote
+        err = try
+            @macroexpand($(esc(expr)))
+            nothing
+        catch _err
+            # https://github.com/JuliaLang/julia/pull/38379
+            if VERSION >= v"1.7.0-DEV.937"
+                _err
+            else
+                # until Julia v1.7
+                # all errors thrown at macro expansion time are LoadErrors, we need to unwrap
+                @assert _err isa LoadError
+                _err.error
+            end
+        end
+        # Reuse `@test_throws` logic
+        if err !== nothing
+            @test_throws $(esc(err_expr)) ($(Meta.quot(expr)); throw(err))
+        else
+            @test_throws $(esc(err_expr)) $(Meta.quot(expr))
+        end
+    end
+end
+
 @testset "SimpleUnPack.jl" begin
     @testset "Variable as RHS" begin
         d = (x=42, y=1.0, z="z")
@@ -64,9 +90,9 @@ end
 
     @testset "Errors" begin
         d = (; x=42, y=1.0)
-        @test_throws ArgumentError @macroexpand @unpack d
-        @test_throws ArgumentError @macroexpand @unpack (; x=42, y=1.0)
-        @test_throws ArgumentError @macroexpand @unpack x, y, (; x=42, y=1.0)
-        @test_throws ArgumentError @macroexpand @unpack x, 1 = (; x=42, y=1.0)
+        @test_macro_throws ArgumentError @unpack d
+        @test_macro_throws ArgumentError @unpack (; x=42, y=1.0)
+        @test_macro_throws ArgumentError @unpack x, y, (; x=42, y=1.0)
+        @test_macro_throws ArgumentError @unpack x, 1 = (; x=42, y=1.0)
     end
 end
