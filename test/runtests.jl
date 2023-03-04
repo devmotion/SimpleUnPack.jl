@@ -1,14 +1,15 @@
 using SimpleUnPack
 using Test
 
-struct Property{T}
-    x::T
+struct Property{X,Y}
+    x::X
+    y::Y
 end
 
-Base.propertynames(::Property) = (:x, :y)
+Base.propertynames(::Property) = (:x, :y, :z)
 function Base.getproperty(x::Property, p::Symbol)
-    if p === :y
-        return 1.0
+    if p === :z
+        return "z"
     else
         return getfield(x, p)
     end
@@ -48,34 +49,46 @@ end
 
 @testset "SimpleUnPack.jl" begin
     @testset "Variable as RHS" begin
-        d = (x=42, y=1.0, z="z")
+        d = (x=42, y=1.0, z="z1")
         @unpack x, z = d
         @test x == 42
-        @test z == "z"
-
-        d = Struct(42, 1.0, "z")
-        @unpack x, z = d
-        @test x == 42
-        @test z == "z"
-
-        d = Property(42)
-        @unpack y, x = d
-        @test x == 42
+        @test z == "z1"
+        @unpack y = d
         @test y == 1.0
+
+        d = Struct(43, 2.0, "z2")
+        @unpack x, z = d
+        @test x == 43
+        @test z == "z2"
+        @unpack y = d
+        @test y == 2.0
+
+        d = Property(44, 3.0)
+        @unpack x, z = d
+        @test x == 44
+        @test z == "z"
+        @unpack y = d
+        @test y == 3.0
     end
 
     @testset "Expression as RHS" begin
-        @unpack x, z = (x=42, y=1.0, z="z")
+        @unpack x, z = (x=42, y=1.0, z="z1")
         @test x == 42
-        @test z == "z"
-
-        @unpack x, z = Struct(42, 1.0, "z")
-        @test x == 42
-        @test z == "z"
-
-        @unpack y, x = Property(42)
-        @test x == 42
+        @test z == "z1"
+        @unpack y = (x=42, y=1.0, z="z1")
         @test y == 1.0
+
+        @unpack x, z = Struct(43, 2.0, "z2")
+        @test x == 43
+        @test z == "z2"
+        @unpack y = Struct(43, 2.0, "z2")
+        @test y == 2.0
+
+        @unpack x, z = Property(44, 3.0)
+        @test x == 44
+        @test z == "z"
+        @unpack y = Property(44, 3.0)
+        @test y == 3.0
     end
 
     @testset "Type inference" begin
@@ -85,7 +98,7 @@ end
         end
         @test @inferred(f((; y=1.0, z="z", x=42))) == (42, 1.0)
         @test @inferred(f(Struct(42, 1.0, "z"))) == (42, 1.0)
-        @test @inferred(f(Property(42))) == (42, 1.0)
+        @test @inferred(f(Property(42, 1.0))) == (42, 1.0)
     end
 
     @testset "Errors" begin
