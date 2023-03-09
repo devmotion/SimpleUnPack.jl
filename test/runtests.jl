@@ -1,7 +1,7 @@
 using SimpleUnPack
 using Test
 
-struct Property{X,Y,Z}
+mutable struct Property{X,Y,Z}
     x::X
     y::Y
     z::Z
@@ -15,11 +15,28 @@ function Base.getproperty(x::Property, p::Symbol)
         return getfield(x, p)
     end
 end
+function Base.setproperty!(x::Property, p::Symbol, val)
+    if p === :z
+        setfield!(x, p, val^2)
+    else
+        setfield!(x, p, val)
+    end
+end
 
-struct Struct{X,Y,Z}
+mutable struct Struct{X,Y,Z}
     x::X
     y::Y
     z::Z
+end
+
+# Define equality (simplifies test code below)
+for T in (:Property, :Struct)
+    @eval begin
+        Base.:(==)(x::$T, y::$T) = x.x == y.x && x.y == y.y && x.z == y.z
+        function Base.isequal(x::$T, y::$T)
+            return isequal(x.x, y.x) && isequal(x.y, y.y) && isequal(x.z, y.z)
+        end
+    end
 end
 
 # Copied from ChainRulesCore: Test if a macro throws an error when it is expanded
@@ -55,7 +72,7 @@ using SimpleUnPack
 end
 
 @testset "SimpleUnPack.jl" begin
-    @testset "Variable as RHS" begin
+    @testset "Variable as LHS/RHS" begin
         d = (x=42, y=1.0, z="z1")
         @unpack x, z = d
         @test x == 42
@@ -71,11 +88,23 @@ end
         @test y == 2.0
 
         d = Struct(44, 3.0, "z3")
+        @pack! d = x, z
+        @test d == Struct(43, 3.0, "z2")
+        @pack! d = y
+        @test d == Struct(43, 2.0, "z2")
+
+        d = Struct(44, 3.0, "z3")
         @unpack x, z = d
         @test x == 44
         @test z == "z3"
         @unpack y = d
         @test y == 3.0
+
+        d = Struct(45, 4.0, "z4")
+        @pack_fields! d = x, z
+        @test d == Struct(44, 4.0, "z3")
+        @pack_fields! d = y
+        @test d == Struct(44, 3.0, "z3")
 
         d = Struct(45, 4.0, "z4")
         @unpack_fields x, z = d
@@ -85,11 +114,23 @@ end
         @test y == 4.0
 
         d = Property(46, 5.0, "z5")
+        @pack! d = x, z
+        @test d == Property(45, 5.0, "z5z5")
+        @pack! d = y
+        @test d == Property(45, 4.0, "z5z5")
+
+        d = Property(46, 5.0, "z5")
         @unpack x, z = d
         @test x == 46
         @test z == "z"
         @unpack y = d
         @test y == 5.0
+
+        d = Property(47, 6.0, "z6")
+        @pack_fields! d = x, z
+        @test d == Property(46, 6.0, "z")
+        @pack_fields! d = y
+        @test d == Property(46, 5.0, "z")
 
         d = Property(47, 6.0, "z6")
         @unpack_fields x, z = d
@@ -99,7 +140,7 @@ end
         @test y == 6.0
     end
 
-    @testset "Expression as RHS" begin
+    @testset "Expression as LHS/RHS" begin
         @unpack x, z = (x=42, y=1.0, z="z1")
         @test x == 42
         @test z == "z1"
