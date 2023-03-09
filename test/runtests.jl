@@ -48,6 +48,12 @@ macro test_macro_throws(err_expr, expr)
     end
 end
 
+# Module for testing behaviour in global scope (issue #3)
+baremodule A
+using SimpleUnPack
+@unpack a = (a=1.5, b=3)
+end
+
 @testset "SimpleUnPack.jl" begin
     @testset "Variable as RHS" begin
         d = (x=42, y=1.0, z="z1")
@@ -160,5 +166,9 @@ end
         @test_macro_throws ArgumentError @unpack_fields (; x=42, y=1.0)
         @test_macro_throws ArgumentError @unpack_fields x, y, (; x=42, y=1.0)
         @test_macro_throws ArgumentError @unpack_fields x, 1 = (; x=42, y=1.0)
+    end
+
+    @testset "global scope (issue #3)" begin
+        @test names(A; all=true) == [:A, :a]
     end
 end
