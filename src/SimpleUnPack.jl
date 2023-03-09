@@ -93,7 +93,7 @@ function destructuring_expr(fsym::Symbol, names, rhs)
     end
     return Base.remove_linenums!(
         quote
-            $(esc(object)) = $(esc(rhs)) # In case the RHS is an expression
+            local $(esc(object)) = $(esc(rhs)) # In case the RHS is an expression
             $block
             $(esc(object)) # Return evaluation of the RHS
         end,
