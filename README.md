@@ -4,8 +4,16 @@
 [![Coverage](https://codecov.io/gh/devmotion/SimpleUnPack.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/devmotion/SimpleUnPack.jl)
 [![Code Style: Blue](https://img.shields.io/badge/code%20style-blue-4495d1.svg)](https://github.com/invenia/BlueStyle)
 
-This package provides the `@unpack` and `@unpack_fields` macros for destructuring properties and fields, respectively.
-The behaviour of `@unpack` is equivalent to the destructuring that was introduced in [Julia#39285](https://github.com/JuliaLang/julia/pull/39285) and is available in Julia >= 1.7.0-DEV.364.
+This package provides four macros, namely
+
+- `@unpack` for destructuring properties,
+- `@pack!` for setting properties,
+- `@unpack_fields` for destructuring fields,
+- `@pack_fields!` for setting fields.
+
+`@unpack`/`@pack!` are based on `getproperty`/`setproperty` whereas `@unpack_fields`/`@pack_fields!` are based on `getfield`/`setfield!`.
+
+In Julia >= 1.7.0-DEV.364, `@unpack` is expanded to the destructuring syntax that was introduced in [Julia#39285](https://github.com/JuliaLang/julia/pull/39285).
 
 ## Examples
 
@@ -40,7 +48,7 @@ An example with a custom struct in a function:
 ```julia
 julia> using SimpleUnPack
 
-julia> struct MyStruct{X,Y}
+julia> mutable struct MyStruct{X,Y}
            x::X
            y::Y
        end
@@ -55,6 +63,14 @@ julia> function Base.getproperty(m::MyStruct, p::Symbol)
            end
        end
 
+julia> function Base.setproperty!(m::MyStruct, p::Symbol, v)
+           if p === :y
+               setfield!(m, p, 2 * v)
+           else
+               setfield!(m, p, v)
+           end
+       end
+
 julia> function g(m::MyStruct)
            @unpack x, y = m
            return (; x, y)
@@ -63,6 +79,14 @@ julia> function g(m::MyStruct)
 julia> g(MyStruct(1.0, -5))
 (x = 1.0, y = 42)
 
+julia> function g!(m::MyStruct, x, y)
+          @pack! m = x, y
+          return m
+       end;
+
+julia> g!(MyStruct(2.1, 5), 1.2, 2)
+MyStruct{Float64, Int64}(1.2, 4)
+
 julia> function h(m::MyStruct)
            @unpack_fields x, y = m
            return (; x, y)
@@ -70,15 +94,22 @@ julia> function h(m::MyStruct)
 
 julia> h(MyStruct(1.0, -5))
 (x = 1.0, y = -5)
+
+julia> function h!(m::MyStruct, x, y)
+          @pack_fields! m = x, y
+          return m
+       end;
+
+julia> h!(MyStruct(2.1, 5), 1.2, 2)
+MyStruct{Float64, Int64}(1.2, 2)
 ```
 
 ## Comparison with UnPack.jl
 
-The syntax of `@unpack` is based on [`UnPack.@unpack`](https://github.com/mauro3/UnPack.jl).
-However, `UnPack.@unpack` is more flexible and based on `UnPack.unpack` instad of `getproperty`.
-While `UnPack.unpack` falls back to `getproperty`, it also supports `AbstractDict`s with keys of type `Symbol` and `AbstractString`, and can be specialized for other types.
-Since `UnPack.unpack` dispatches on `Val(property)` instances, this increased flexibility comes at the cost of increased compilation times.
+The syntax of `@unpack` and `@pack!` is based on `UnPack.@unpack` and `UnPack.@pack!` in [UnPack.jl](https://github.com/mauro3/UnPack.jl).
 
-In contrast to SimpleUnPack, UnPack provides an `UnPack.@pack!` macro for setting properties.
+`UnPack.@unpack`/`UnPack.@pack!` are more flexible since they are based on `UnPack.unpack`/`UnPack.pack!` instad of `getproperty`/`setproperty!`.
+While `UnPack.unpack`/`UnPack.pack!` fall back to `getproperty`/`setproperty!`, they also support `AbstractDict`s with keys of type `Symbol` and `AbstractString` and can be specialized for other types.
+Since `UnPack.unpack` and `UnPack.pack!` dispatch on `Val(property)` instances, this increased flexibility comes at the cost of increased number of specializations and increased compilation times.
 
-However, currently UnPack does not support destructuring based on `getfield` only ([UnPack#23](https://github.com/mauro3/UnPack.jl/issues/23)).
+In contrast to SimpleUnPack, currently UnPack does not support destructuring/updating based on `getfield`/`setfield!` only ([UnPack#23](https://github.com/mauro3/UnPack.jl/issues/23)).
