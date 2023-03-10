@@ -88,6 +88,7 @@ The symbol `macro_name` specifies the macro from which this function is called.
 This function is used internally with `macrosym = :unpack`, `macrosym = :unpack_fields`, `macrosym = :pack!`, and `macrosym = :pack_fields!`.
 """
 function split_names_object(macrosym::Symbol, expr, object_on_rhs::Bool)
+    # Split expression in LHS and RHS
     if !Meta.isexpr(expr, :(=), 2)
         throw(
             ArgumentError(
@@ -97,13 +98,23 @@ function split_names_object(macrosym::Symbol, expr, object_on_rhs::Bool)
         )
     end
     lhs, rhs = expr.args
-    names_side = object_on_rhs ? lhs : rhs
-    names = if names_side isa Symbol
-        [names_side]
-    elseif Meta.isexpr(names_side, :tuple) &&
-        !isempty(names_side.args) &&
-        all(x -> x isa Symbol, names_side.args)
-        names_side.args
+
+    # Clean expression with keys a bit:
+    # Remove line numbers and unwrap it from `:block` expression
+    names_expr = object_on_rhs ? lhs : rhs
+    Base.remove_linenums!(names_expr)
+    if Meta.isexpr(names_expr, :block, 1)
+        names_expr = names_expr.args[1]
+    end
+
+    # Ensure that names are given as symbol or tuple of symbols,
+    # and convert them to a vector of symbols
+    names = if names_expr isa Symbol
+        [names_expr]
+    elseif Meta.isexpr(names_expr, :tuple) &&
+        !isempty(names_expr.args) &&
+        all(x -> x isa Symbol, names_expr.args)
+        names_expr.args
     else
         throw(
             ArgumentError(
@@ -112,7 +123,10 @@ function split_names_object(macrosym::Symbol, expr, object_on_rhs::Bool)
             ),
         )
     end
+
+    # Extract the object
     object = object_on_rhs ? rhs : lhs
+
     return names, object
 end
 
@@ -149,15 +163,19 @@ This function is used internally with `fsym = :setproperty!` and `fsym = :setfie
 """
 function updating_expr(fsym::Symbol, object, names)
     @gensym instance
-    block = Expr(:block)
-    for p in names
-        push!(block.args, Expr(:call, fsym, esc(instance), QuoteNode(p), esc(p)))
+    if length(names) == 1
+        p = first(names)
+        expr = Expr(:call, fsym, esc(instance), QuoteNode(p), esc(p))
+    else
+        expr = Expr(:tuple)
+        for p in names
+            push!(expr.args, Expr(:call, fsym, esc(instance), QuoteNode(p), esc(p)))
+        end
     end
     return Base.remove_linenums!(
         quote
             local $(esc(instance)) = $(esc(object)) # In case the object is an expression
-            $block
-            ($(map(esc, names)...),)
+            $expr
         end,
     )
 end
